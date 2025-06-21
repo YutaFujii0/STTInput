@@ -18,7 +18,8 @@ let package = Package(
                 "AudioCaptureKit",
                 "WhisperClient",
                 "TextInjector"
-            ]
+            ],
+            exclude: ["Info.plist"]
         ),
         .target(
             name: "InputMonitorKit",
@@ -39,6 +40,31 @@ let package = Package(
         .target(
             name: "TextInjector",
             dependencies: []
+        ),
+        
+        // MARK: - Test Targets
+        .testTarget(
+            name: "STTInputTests",
+            dependencies: [
+                "STTInput",
+                "InputMonitorKit",
+                "OverlayUI",
+                "AudioCaptureKit",
+                "WhisperClient",
+                "TextInjector"
+            ]
+        ),
+        .testTarget(
+            name: "InputMonitorKitTests",
+            dependencies: ["InputMonitorKit"]
+        ),
+        .testTarget(
+            name: "AudioCaptureKitTests",
+            dependencies: ["AudioCaptureKit"]
+        ),
+        .testTarget(
+            name: "WhisperClientTests",
+            dependencies: ["WhisperClient"]
         )
     ]
 )
