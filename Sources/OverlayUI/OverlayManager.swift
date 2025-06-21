@@ -92,7 +92,7 @@ public class OverlayManager: ObservableObject {
         micWindow?.backgroundColor = .clear
         micWindow?.isOpaque = false
         micWindow?.hasShadow = true
-        let windowSize = recording ? NSSize(width: 120, height: 60) : NSSize(width: 44, height: 44)
+        let windowSize = recording ? NSSize(width: 140, height: 36) : NSSize(width: 44, height: 44)
         micWindow?.setContentSize(windowSize)
         micWindow?.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         micWindow?.isReleasedWhenClosed = false
@@ -117,8 +117,8 @@ public class OverlayManager: ObservableObject {
         
         var windowFrame = window.frame
         windowFrame.origin = CGPoint(
-            x: screenFrame.maxX - windowFrame.width - 20,
-            y: screenFrame.maxY - windowFrame.height - 20
+            x: screenFrame.maxX - windowFrame.width - 10,  // Changed from 20 to 10 to match statusWindow
+            y: screenFrame.maxY - windowFrame.height - 10  // Changed from 20 to 10 to match statusWindow
         )
         
         print("Positioning window at: \(windowFrame)")
@@ -157,42 +157,69 @@ struct MicButtonView: View {
 struct StopButtonView: View {
     let onTap: () -> Void
     @State private var isHovered = false
-    @State private var isPulsing = false
+    @State private var shimmerOffset: CGFloat = -100
     
     var body: some View {
-        VStack(spacing: 4) {
-            Button(action: onTap) {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
                 ZStack {
-                    // Pulsing background
+                    // Red gradient background
                     Circle()
-                        .fill(Color.red.opacity(0.3))
-                        .frame(width: 40, height: 40)
-                        .scaleEffect(isPulsing ? 1.2 : 1.0)
-                        .opacity(isPulsing ? 0.0 : 1.0)
-                        .animation(Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: false), value: isPulsing)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(red: 0.8, green: 0, blue: 0.2), Color(red: 1.0, green: 0.2, blue: 0.3)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
                     
-                    // Main button
+                    // Shimmer effect overlay
                     Circle()
-                        .fill(isHovered ? Color.red : Color.red.opacity(0.8))
-                        .frame(width: 40, height: 40)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.clear, Color.white.opacity(0.3), Color.clear]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+                        .mask(
+                            Rectangle()
+                                .fill(Color.white)
+                                .frame(width: 20, height: 28)
+                                .offset(x: shimmerOffset)
+                        )
                     
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 20))
+                        .font(.system(size: 14))
                         .foregroundColor(.white)
                 }
-                .shadow(radius: 4)
+                
+                Text("Hearing you...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(red: 0.8, green: 0, blue: 0.2), Color(red: 1.0, green: 0.2, blue: 0.3)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(4)
             }
-            .buttonStyle(PlainButtonStyle())
-            .onHover { hovering in
-                isHovered = hovering
-            }
-            
-            Text("⌘⌘ to stop")
-                .font(.system(size: 10))
-                .foregroundColor(.gray)
+            .padding(4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hovering in
+            isHovered = hovering
         }
         .onAppear {
-            isPulsing = true
+            withAnimation(Animation.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                shimmerOffset = 100
+            }
         }
     }
 }
@@ -211,7 +238,7 @@ extension OverlayManager {
         statusWindow?.backgroundColor = .clear
         statusWindow?.isOpaque = false
         statusWindow?.hasShadow = false
-        statusWindow?.setContentSize(NSSize(width: 30, height: 30))
+        statusWindow?.setContentSize(NSSize(width: 140, height: 36))
         statusWindow?.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         statusWindow?.isReleasedWhenClosed = false
         
@@ -231,23 +258,33 @@ extension OverlayManager {
 }
 
 struct StatusIndicatorView: View {
-    @State private var opacity: Double = 0.6
+    @State private var opacity: Double = 0.7
     
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.black.opacity(0.5))
-                .frame(width: 28, height: 28)
-            
-            Image(systemName: "mic.fill")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(opacity))
-                .onAppear {
-                    withAnimation(Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                        opacity = 1.0
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.7))
+                    .frame(width: 28, height: 28)
+                
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.black.opacity(opacity))
+                    .onAppear {
+                        withAnimation(Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                            opacity = 1.0
+                        }
                     }
-                }
+            }
+            
+            Text("⌘x3 to Record")
+                .font(.system(size: 12))
+                .foregroundColor(.black.opacity(0.9))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.7))
+                .cornerRadius(4)
         }
-        .frame(width: 30, height: 30)
+        .padding(4)
     }
 }
