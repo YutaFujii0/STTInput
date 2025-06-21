@@ -47,8 +47,44 @@ Set your OpenAI API key using one of these methods:
 
 ### Running the App
 
+#### Manual Run
 ```bash
-.build/release/STTInput
+./run.sh
+```
+
+#### Automatic Startup (Recommended)
+To enable the app to start automatically at login:
+
+```bash
+chmod +x install_autostart.sh
+./install_autostart.sh
+```
+
+This will:
+- Build the app in release mode
+- Install a launch agent that starts the app automatically at login
+- Start the service immediately
+- Keep the app running in the background
+
+#### Managing the Service
+Once installed, you can manage the service with these commands:
+
+```bash
+# Check service status
+launchctl list | grep sttinput
+
+# Stop the service
+launchctl stop net.yutafujii.sttinput
+
+# Restart the service
+launchctl stop net.yutafujii.sttinput && launchctl start net.yutafujii.sttinput
+
+# View logs
+tail -f /tmp/sttinput.log
+
+# Uninstall automatic startup
+launchctl unload ~/Library/LaunchAgents/net.yutafujii.sttinput.plist
+rm ~/Library/LaunchAgents/net.yutafujii.sttinput.plist
 ```
 
 ### Permissions

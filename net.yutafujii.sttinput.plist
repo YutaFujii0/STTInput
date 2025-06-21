@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>net.yutafujii.sttinput</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/yuta/code/hobby/stt-input-macos/STTInput/.build/release/STTInput</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yuta/code/hobby/stt-input-macos/STTInput</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/sttinput.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/sttinput.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist> 
