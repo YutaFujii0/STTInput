@@ -47,9 +47,7 @@ public class OverlayManager: ObservableObject {
     }
     
     public func showStopButton() {
-        print("OverlayManager: showStopButton called")
         DispatchQueue.main.async { [weak self] in
-            print("OverlayManager: Creating stop button window")
             self?.isRecording = true
             self?.hideTimer?.invalidate()
             self?.hideStatusIndicator() // Hide status indicator when recording

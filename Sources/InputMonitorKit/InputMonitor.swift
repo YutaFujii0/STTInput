@@ -20,8 +20,10 @@ public class InputMonitor {
     
     public func start() {
         guard AXIsProcessTrusted() else {
-            print("Accessibility permission required")
-            requestAccessibilityPermission()
+            print("PERMISSION ERROR: Accessibility permission required for STTInput")
+            print("To fix: System Preferences → Security & Privacy → Privacy → Accessibility")
+            print("Add: /Users/yuta/code/hobby/stt-input-macos/STTInput/.build/release/STTInput")
+            requestAccessibilityPermission()            
             return
         }
         
@@ -101,11 +103,8 @@ public class InputMonitor {
             self?.cmdPressCount = 0
         }
         
-        print("Cmd press count: \(cmdPressCount), isRecording: \(isRecording)")
-        
         // Check for double press when recording
         if cmdPressCount == 2 && isRecording {
-            print("Double Cmd detected while recording")
             cmdPressCount = 0
             cmdResetTimer?.invalidate()
             onDoubleCmdPress?()
@@ -114,7 +113,6 @@ public class InputMonitor {
         
         // Check for triple press when not recording
         if cmdPressCount >= 3 && !isRecording {
-            print("Triple Cmd detected while not recording")
             cmdPressCount = 0
             cmdResetTimer?.invalidate()
             onTripleCmdPress?()

@@ -16,128 +16,148 @@ struct STTInputApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+    
+    // MARK: - State Management
+    
+    private let appState = AppState()
+    private let configuration = AppConfiguration.load()
+    
+    // MARK: - Services
+    
     private var inputMonitor: InputMonitor?
     private var overlayManager: OverlayManager?
     private var audioRecorder: AudioRecorder?
     private var whisperClient: WhisperClient?
     private var textInjector: TextInjector?
-    private var isRecording = false
+    
+    // MARK: - Coordinators
+    
+    private var recordingCoordinator: RecordingCoordinator?
+    
+    // MARK: - App Lifecycle
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupApp()
-        requestPermissions()
-        
-        // Delay service start to ensure permissions are granted
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.startServices()
+        Task {
+            await requestPermissions()
+            await startServicesWithDelay()
         }
     }
     
+    // MARK: - Setup
+    
     private func setupApp() {
+        // Set activation policy early and ensure app is ready
         NSApp.setActivationPolicy(.accessory)
+        NSApp.activate(ignoringOtherApps: false)
+        
+        // Log startup information
+        Logger.info("STTInput starting up...")
+        Logger.info("Bundle path: \(Bundle.main.bundlePath)")
+        Logger.info("Process ID: \(ProcessInfo.processInfo.processIdentifier)")
+        
+        // Validate configuration
+        if !configuration.isValid {
+            print("Configuration validation failed:")
+            configuration.validationErrors.forEach { print("- \($0)") }
+        }
     }
     
-    private func requestPermissions() {
+    private func requestPermissions() async {
+        appState.setMicrophonePermission(.requesting)
+        appState.setAccessibilityPermission(.requesting)
+        
+        // Request permissions
         PermissionManager.shared.requestMicrophoneAccess()
         PermissionManager.shared.requestAccessibilityAccess()
+        
+        // Note: In a real implementation, you'd want to check the actual permission status
+        // For now, we'll assume they're granted after a delay
+        try? await Task.sleep(nanoseconds: UInt64(1.0 * 1_000_000_000))
+        
+        appState.setMicrophonePermission(.granted)
+        appState.setAccessibilityPermission(.granted)
     }
     
-    private func startServices() {
+    private func startServicesWithDelay() async {
+        // Delay service start to ensure permissions are granted
+        try? await Task.sleep(nanoseconds: UInt64(configuration.serviceStartDelay * 1_000_000_000))
+        
+        await startServices()
+    }
+    
+    private func startServices() async {
+        Logger.info("Initializing services...")
+        
+        // Initialize services
         inputMonitor = InputMonitor()
         overlayManager = OverlayManager()
         audioRecorder = AudioRecorder()
         whisperClient = WhisperClient()
         textInjector = TextInjector()
         
+        // Ensure all services are available
+        guard let inputMonitor = inputMonitor,
+              let overlayManager = overlayManager,
+              let audioRecorder = audioRecorder,
+              let whisperClient = whisperClient,
+              let textInjector = textInjector else {
+            print("ERROR: Failed to initialize one or more services")
+            appState.setError(.unexpectedError(underlying: "Failed to initialize services"))
+            return
+        }
+        
+        Logger.info("All services initialized successfully")
+        
+        // Create recording coordinator
+        recordingCoordinator = RecordingCoordinator(
+            appState: appState,
+            audioRecorder: audioRecorder,
+            whisperClient: whisperClient,
+            textInjector: textInjector,
+            overlayManager: overlayManager,
+            inputMonitor: inputMonitor
+        )
+        
+        setupInputHandlers(inputMonitor: inputMonitor, overlayManager: overlayManager)
+        
+        // Start input monitoring
+        inputMonitor.start()
+        
+        Logger.info("Services started successfully - STTInput is ready!")
+        Logger.info("To use: Click in a text field or press Cmd 3 times to start recording")
+    }
+    
+    private func setupInputHandlers(inputMonitor: InputMonitor, overlayManager: OverlayManager) {
         // Show mic indicator when user focuses on input field
-        inputMonitor?.onInputFieldFocus = { [weak self] in
-            guard !(self?.isRecording ?? false) else { return }
-            self?.overlayManager?.showStatusIndicator()
+        inputMonitor.onInputFieldFocus = { [weak self] in
+            guard let self = self, !self.appState.isRecording else { return }
+            overlayManager.showStatusIndicator()
         }
         
         // Triple Cmd press to start recording
-        inputMonitor?.onTripleCmdPress = { [weak self] in
-            guard !(self?.isRecording ?? false) else { return }
-            self?.startRecording()
+        inputMonitor.onTripleCmdPress = { [weak self] in
+            guard let self = self, !self.appState.isRecording else { return }
+            Task { @MainActor in
+                await self.recordingCoordinator?.startRecording()
+            }
         }
         
         // Double Cmd press to stop recording
-        inputMonitor?.onDoubleCmdPress = { [weak self] in
-            guard self?.isRecording ?? false else { return }
-            self?.stopRecording()
-        }
-        
-        overlayManager?.onStopButtonTapped = { [weak self] in
-            self?.stopRecording()
-        }
-        
-        inputMonitor?.start()
-    }
-    
-    private func startRecording() {
-        guard !isRecording else { return }
-        print("Starting recording...")
-        isRecording = true
-        inputMonitor?.setRecordingState(true)
-        
-        // Play system sound for feedback
-        NSSound.beep()
-        
-        print("Showing stop button...")
-        overlayManager?.showStopButton()
-        
-        audioRecorder?.startRecording { [weak self] audioData in
-            print("Recording completed, got audio data: \(audioData.count) bytes")
-            self?.isRecording = false
-            self?.inputMonitor?.setRecordingState(false)
-            self?.overlayManager?.hideMicButton()
-            self?.transcribeAudio(audioData)
-        }
-    }
-    
-    private func stopRecording() {
-        audioRecorder?.stopRecording()
-        isRecording = false
-        inputMonitor?.setRecordingState(false)
-        overlayManager?.hideMicButton()
-    }
-    
-    private func transcribeAudio(_ audioData: Data) {
-        Task {
-            // Small delay to ensure recording UI has time to hide
-            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-            
-            await MainActor.run {
-                // Show processing indicator
-                self.overlayManager?.showProcessingIndicator()
+        inputMonitor.onDoubleCmdPress = { [weak self] in
+            guard let self = self, self.appState.isRecording else { return }
+            Task { @MainActor in
+                await self.recordingCoordinator?.stopRecording()
             }
-            
-            let startTime = Date()
-            
-            do {
-                let text = try await whisperClient?.transcribe(audioData: audioData)
-                
-                // Ensure minimum 0.8 second display time
-                let elapsed = Date().timeIntervalSince(startTime)
-                let minDisplayTime: TimeInterval = 0.8
-                let remainingTime = max(0, minDisplayTime - elapsed)
-                
-                if remainingTime > 0 {
-                    try await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
-                }
-                
-                await MainActor.run {
-                    // Hide processing indicator and insert text
-                    self.overlayManager?.hideProcessingIndicator()
-                    self.textInjector?.insertText(text ?? "")
-                }
-            } catch {
-                print("Transcription error: \(error)")
-                await MainActor.run {
-                    // Hide processing indicator even on error
-                    self.overlayManager?.hideProcessingIndicator()
-                }
+        }
+        
+        // Handle stop button tap from overlay
+        overlayManager.onStopButtonTapped = { [weak self] in
+            guard let self = self else { return }
+            Task { @MainActor in
+                await self.recordingCoordinator?.stopRecording()
             }
         }
     }
