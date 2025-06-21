@@ -4,6 +4,7 @@ import AppKit
 public class OverlayManager: ObservableObject {
     private var micWindow: NSWindow?
     private var statusWindow: NSWindow?
+    private var processingWindow: NSWindow?
     private var hideTimer: Timer?
     private var statusHideTimer: Timer?
     private let displayDuration: TimeInterval = 5.0
@@ -66,13 +67,60 @@ public class OverlayManager: ObservableObject {
         }
     }
     
-    private func createMicWindow(recording: Bool) {
-        print("Creating window, recording: \(recording)")
+    public func showProcessingIndicator() {
+        DispatchQueue.main.async { [weak self] in
+            self?.hideTimer?.invalidate()
+            self?.hideStatusIndicator()
+            self?.createProcessingWindow()
+        }
+    }
+    
+    public func hideProcessingIndicator() {
+        DispatchQueue.main.async { [weak self] in
+            self?.processingWindow?.close()
+            self?.processingWindow = nil
+        }
+    }
+    
+    private func createProcessingWindow() {
+        processingWindow?.close()
+        processingWindow = nil
+        
+        let contentView = ProcessingView()
+        let hostingController = NSHostingController(rootView: contentView)
+        
+        processingWindow = NSWindow(contentViewController: hostingController)
+        processingWindow?.styleMask = [.borderless]
+        processingWindow?.level = .statusBar
+        processingWindow?.backgroundColor = .clear
+        processingWindow?.isOpaque = false
+        processingWindow?.hasShadow = false
+        processingWindow?.setContentSize(NSSize(width: 140, height: 36))
+        processingWindow?.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        processingWindow?.isReleasedWhenClosed = false
+        
+        // Position in top-right corner
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            var windowFrame = processingWindow!.frame
+            windowFrame.origin = CGPoint(
+                x: screenFrame.maxX - windowFrame.width - 10,
+                y: screenFrame.maxY - windowFrame.height - 10
+            )
+            processingWindow?.setFrame(windowFrame, display: true)
+        }
+        
+        processingWindow?.orderFront(nil)
+    }
+    
+    private func createMicWindow(recording: Bool, processing: Bool = false) {
         micWindow?.close()
         micWindow = nil
         
         let contentView: AnyView
-        if recording {
+        if processing {
+            contentView = AnyView(ProcessingView())
+        } else if recording {
             contentView = AnyView(StopButtonView { [weak self] in
                 self?.onStopButtonTapped?()
                 self?.hideMicButton()
@@ -92,36 +140,26 @@ public class OverlayManager: ObservableObject {
         micWindow?.backgroundColor = .clear
         micWindow?.isOpaque = false
         micWindow?.hasShadow = true
-        let windowSize = recording ? NSSize(width: 140, height: 36) : NSSize(width: 44, height: 44)
+        let windowSize = (recording || processing) ? NSSize(width: 140, height: 36) : NSSize(width: 44, height: 44)
         micWindow?.setContentSize(windowSize)
         micWindow?.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         micWindow?.isReleasedWhenClosed = false
         
         micWindow?.orderFront(nil)
         micWindow?.makeKeyAndOrderFront(nil)
-        print("Window created and ordered to front")
     }
     
     private func positionWindowNearCursor() {
-        guard let window = micWindow else { 
-            print("No window to position")
-            return 
-        }
+        guard let window = micWindow else { return }
+        guard let screen = NSScreen.main else { return }
         
-        // Position in the top-right corner of the screen for better visibility
-        guard let screen = NSScreen.main else { 
-            print("No main screen found")
-            return 
-        }
         let screenFrame = screen.visibleFrame
-        
         var windowFrame = window.frame
         windowFrame.origin = CGPoint(
-            x: screenFrame.maxX - windowFrame.width - 10,  // Changed from 20 to 10 to match statusWindow
-            y: screenFrame.maxY - windowFrame.height - 10  // Changed from 20 to 10 to match statusWindow
+            x: screenFrame.maxX - windowFrame.width - 10,
+            y: screenFrame.maxY - windowFrame.height - 10
         )
         
-        print("Positioning window at: \(windowFrame)")
         window.setFrame(windowFrame, display: true)
     }
     
@@ -151,6 +189,52 @@ struct MicButtonView: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+struct ProcessingView: View {
+    @State private var isRotating = false
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                // Blue gradient background
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.3, green: 0.5, blue: 1.0)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+                
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white)
+                    .rotationEffect(.degrees(isRotating ? 360 : 0))
+                    .onAppear {
+                        withAnimation(Animation.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                            isRotating = true
+                        }
+                    }
+            }
+            
+            Text("Processing...")
+                .font(.system(size: 12))
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color(red: 0.2, green: 0.4, blue: 0.8), Color(red: 0.3, green: 0.5, blue: 1.0)]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(4)
+        }
+        .padding(4)
     }
 }
 

@@ -105,13 +105,39 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     
     private func transcribeAudio(_ audioData: Data) {
         Task {
+            // Small delay to ensure recording UI has time to hide
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            await MainActor.run {
+                // Show processing indicator
+                self.overlayManager?.showProcessingIndicator()
+            }
+            
+            let startTime = Date()
+            
             do {
                 let text = try await whisperClient?.transcribe(audioData: audioData)
+                
+                // Ensure minimum 0.8 second display time
+                let elapsed = Date().timeIntervalSince(startTime)
+                let minDisplayTime: TimeInterval = 0.8
+                let remainingTime = max(0, minDisplayTime - elapsed)
+                
+                if remainingTime > 0 {
+                    try await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
+                }
+                
                 await MainActor.run {
+                    // Hide processing indicator and insert text
+                    self.overlayManager?.hideProcessingIndicator()
                     self.textInjector?.insertText(text ?? "")
                 }
             } catch {
                 print("Transcription error: \(error)")
+                await MainActor.run {
+                    // Hide processing indicator even on error
+                    self.overlayManager?.hideProcessingIndicator()
+                }
             }
         }
     }
