@@ -61,12 +61,19 @@ The app will prompt for these permissions automatically.
 
 ## Usage
 
-1. Start typing in any application
-2. A microphone button will appear near your cursor
-3. Click the mic button to start recording
-4. Speak your text
-5. Click the stop button or wait for auto-stop (120 seconds max)
-6. The transcribed text will be inserted at your cursor position
+1. Place your cursor where you want to insert text
+2. Press the **Command key three times quickly** (⌘⌘⌘) to start recording
+3. Speak your text
+4. Press the **Command key twice quickly** (⌘⌘) to stop recording
+   - Or click the stop button in the top-right corner
+   - Or wait for auto-stop (120 seconds max)
+5. The transcribed text will be inserted at your cursor position
+
+**Key Controls**:
+- **⌘⌘⌘** (triple Cmd): Start recording
+- **⌘⌘** (double Cmd): Stop recording
+
+**Note**: The keyboard triggers work from anywhere in macOS, ensuring reliable text insertion at your current cursor position without losing focus.
 
 ## Building from Xcode
 

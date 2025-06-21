@@ -50,13 +50,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         whisperClient = WhisperClient()
         textInjector = TextInjector()
         
-        inputMonitor?.onKeyboardInput = { [weak self] in
+        // Show mic indicator when user focuses on input field
+        inputMonitor?.onInputFieldFocus = { [weak self] in
             guard !(self?.isRecording ?? false) else { return }
-            self?.overlayManager?.showMicButton()
+            self?.overlayManager?.showStatusIndicator()
         }
         
-        overlayManager?.onMicButtonTapped = { [weak self] in
+        // Triple Cmd press to start recording
+        inputMonitor?.onTripleCmdPress = { [weak self] in
+            guard !(self?.isRecording ?? false) else { return }
             self?.startRecording()
+        }
+        
+        // Double Cmd press to stop recording
+        inputMonitor?.onDoubleCmdPress = { [weak self] in
+            guard self?.isRecording ?? false else { return }
+            self?.stopRecording()
         }
         
         overlayManager?.onStopButtonTapped = { [weak self] in
@@ -68,11 +77,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     
     private func startRecording() {
         guard !isRecording else { return }
+        print("Starting recording...")
         isRecording = true
+        inputMonitor?.setRecordingState(true)
+        
+        // Play system sound for feedback
+        NSSound.beep()
+        
+        print("Showing stop button...")
         overlayManager?.showStopButton()
         
         audioRecorder?.startRecording { [weak self] audioData in
+            print("Recording completed, got audio data: \(audioData.count) bytes")
             self?.isRecording = false
+            self?.inputMonitor?.setRecordingState(false)
             self?.overlayManager?.hideMicButton()
             self?.transcribeAudio(audioData)
         }
@@ -81,6 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func stopRecording() {
         audioRecorder?.stopRecording()
         isRecording = false
+        inputMonitor?.setRecordingState(false)
         overlayManager?.hideMicButton()
     }
     
