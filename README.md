@@ -2,6 +2,11 @@
 
 A lightweight macOS background utility that enhances typing productivity by allowing users to dictate text input using OpenAI's Whisper API.
 
+![sttinput_demo1](https://github.com/user-attachments/assets/468887fd-6270-4570-9da1-1bd3a5cc65e0)
+
+![sttinput_demo2](https://github.com/user-attachments/assets/eb91d874-8b1c-4233-bbe9-89243e481fbe)
+
+
 ## Features
 
 - Global keyboard input monitoring
